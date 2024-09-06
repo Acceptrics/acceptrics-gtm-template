@@ -1,0 +1,5 @@
+homepage: "https://acceptrics.com/"
+documentation: "https://acceptrics.com/faq.html"
+versions:
+  - sha: 
+    changeNotes: Initial release.
