@@ -1,5 +1,5 @@
 homepage: "https://acceptrics.com/"
 documentation: "https://acceptrics.com/faq.html"
 versions:
-  - sha: 
+  - sha: 350d64e64f905b76fd19b71a7a9f2efc4cf5d329
     changeNotes: Initial release.
