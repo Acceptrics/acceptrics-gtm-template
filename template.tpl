@@ -75,7 +75,7 @@ const wait_for_update = 500;
 const eeaRegions = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
 
 gtagSet({
-    'developer_id.dYWU2Od': true
+    'developer_id.dYWU2OD': true
 });
 
 localStorage.setItem('__acceptrics_conf', JSON.stringify({ geoArea: data.isEu == true ? "eea" : "worldwide", gcmAdvanced: data.enableConsentMode }));
@@ -113,7 +113,6 @@ if (!queryPermission('inject_script', scriptSrc))
     return data.gtmOnFailure();
 injectScript(scriptSrc, () => {
     callInWindow('acceptrics.initializeSettings', '');
-    callInWindow('acceptrics.showBanner', '');
 }, data.gtmOnFailure);
 
 
