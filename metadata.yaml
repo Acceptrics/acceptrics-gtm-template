@@ -1,5 +1,7 @@
 homepage: "https://acceptrics.com/"
 documentation: "https://acceptrics.com/faq.html"
 versions:
+  - sha: 53c4a0cf0cc6568b51594004562c38bbb65daa5e
+    changeNotes: Fixed incorrect developer id.
   - sha: 350d64e64f905b76fd19b71a7a9f2efc4cf5d329
     changeNotes: Initial release.
