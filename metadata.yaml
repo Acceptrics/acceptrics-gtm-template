@@ -1,6 +1,14 @@
 homepage: "https://acceptrics.com/"
-documentation: "https://acceptrics.com/faq.html"
+documentation: "https://acceptrics.com/docs"
 versions:
+  - sha: 913cd465c02acd790cd328378b8f86298fa11cca
+    changeNotes: >
+      Added a required Account ID field with setup instructions (get one free
+      at acceptrics.com/wizard). The banner now loads per-account from
+      acct.acceptrics.com so each account's saved configuration and usage are
+      applied correctly. Extended Google Consent Mode defaults to the UK,
+      Switzerland and the full EEA. Hardened returning-visitor consent restore.
+      Added template tests.
   - sha: 53c4a0cf0cc6568b51594004562c38bbb65daa5e
     changeNotes: Fixed incorrect developer id.
   - sha: 350d64e64f905b76fd19b71a7a9f2efc4cf5d329
