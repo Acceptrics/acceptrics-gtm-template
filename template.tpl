@@ -34,6 +34,18 @@ ___TEMPLATE_PARAMETERS___
 
 [
   {
+    "type": "TEXT",
+    "name": "accountId",
+    "displayName": "Acceptrics Account ID",
+    "simpleValueType": true,
+    "help": "Links this banner to your Acceptrics account so your settings and usage are applied correctly (for example: b81d7rbl).<br><br><b>Don't have an Account ID yet? It's free.</b><br>1. Go to <a href=\"https://acceptrics.com/wizard\">https://acceptrics.com/wizard</a><br>2. Enter your email and customize your banner — no credit card required.<br>3. Your Account ID is shown on the final step (and emailed to you).<br>4. Copy it and paste it into this field.<br><br>Already have an account? Find your Account ID at <a href=\"https://acceptrics.com/account\">https://acceptrics.com/account</a>.",
+    "valueValidators": [
+      {
+        "type": "NON_EMPTY"
+      }
+    ]
+  },
+  {
     "type": "CHECKBOX",
     "name": "enableConsentMode",
     "checkboxText": "Enable Advanced Consent Mode",
@@ -64,21 +76,26 @@ const queryPermission = require('queryPermission');
 const setDefaultConsentState = require('setDefaultConsentState');
 const encodeUri = require('encodeUri');
 const getCookieValues = require('getCookieValues');
-const callInWindow = require('callInWindow');
 const Object = require('Object');
 const localStorage = require('localStorage');
 const updateConsentState = require('updateConsentState');
 const JSON = require('JSON');
 
-const wait_for_update = 500;
-
-const eeaRegions = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
+// Consent-default regions. Must cover everything the "EEA, Switzerland and UK"
+// option promises: EU-27 + the EEA non-EU states (Iceland, Liechtenstein,
+// Norway) + Switzerland (CH) + the UK (GB). Omitting GB/CH here meant UK and
+// Swiss visitors got no denied-by-default consent state despite the box.
+const eeaRegions = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "CH", "GB"];
 
 gtagSet({
     'developer_id.dYWU2OD': true
 });
 
-localStorage.setItem('__acceptrics_conf', JSON.stringify({ geoArea: data.isEu == true ? "eea" : "worldwide", gcmAdvanced: data.enableConsentMode }));
+// Banner configuration (custom cookies, styling, text, geo) is applied by the
+// account script loaded from acct.acceptrics.com below — it writes the full
+// __acceptrics_conf and loads the engine. We no longer hand-write a partial
+// conf here (it would only be overwritten) and no longer load cdn.acceptrics.com
+// directly.
 
 if (data.enableConsentMode) {
     if (data.isEu) {
@@ -94,7 +111,7 @@ let aData;
 if (accStr) {
     aData = JSON.parse(accStr);
 }
-if (typeof aData === 'object') {
+if (typeof aData === 'object' && aData !== null && aData.consent) {
     if (aData.consent.ad_storage && aData.consent.analytics_storage && aData.consent.ad_personalization && aData.consent.ad_user_data) {
         updateConsentState({
             ad_storage: aData.consent.ad_storage == "accepted" ? 'granted' : 'denied',
@@ -107,13 +124,16 @@ if (typeof aData === 'object') {
 
 /**
  * Banner Script Tag
+ *
+ * Load the account's script from acct.acceptrics.com/{accountId}. That script
+ * applies the account's saved configuration (custom cookies, styling, text)
+ * and loads the banner engine itself — so account settings are always applied.
+ * We load from acct rather than cdn.acceptrics.com directly for this reason.
  */
-let scriptSrc = 'https://cdn.acceptrics.com/';
+let scriptSrc = 'https://acct.acceptrics.com/' + encodeUri(data.accountId);
 if (!queryPermission('inject_script', scriptSrc))
     return data.gtmOnFailure();
-injectScript(scriptSrc, () => {
-    callInWindow('acceptrics.initializeSettings', '');
-}, data.gtmOnFailure);
+injectScript(scriptSrc, data.gtmOnSuccess, data.gtmOnFailure);
 
 
 ___WEB_PERMISSIONS___
@@ -133,7 +153,7 @@ ___WEB_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://cdn.acceptrics.com/"
+                "string": "https://acct.acceptrics.com/"
               }
             ]
           }
@@ -797,7 +817,50 @@ ___WEB_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
+scenarios:
+- name: Regression - banner loads from the acct subdomain with the account ID
+  code: |-
+    const mockData = { accountId: 'abc123', enableConsentMode: true, isEu: false };
+
+    let capturedUrl;
+    mock('queryPermission', () => true);
+    mockObject('localStorage', { getItem: () => null, setItem: () => {} });
+    mock('injectScript', (url) => { capturedUrl = url; });
+
+    runCode(mockData);
+
+    assertThat(capturedUrl).isEqualTo('https://acct.acceptrics.com/abc123');
+- name: EEA UK and Switzerland option applies consent defaults to GB and CH
+  code: |-
+    const mockData = { accountId: 'abc123', enableConsentMode: true, isEu: true };
+
+    let consentArg;
+    mock('queryPermission', () => true);
+    mock('injectScript', () => {});
+    mockObject('localStorage', { getItem: () => null, setItem: () => {} });
+    mock('setDefaultConsentState', (arg) => { consentArg = arg; });
+
+    runCode(mockData);
+
+    assertThat(consentArg.region).contains('GB');
+    assertThat(consentArg.region).contains('CH');
+- name: Does not crash when stored settings have no consent object
+  code: |-
+    const mockData = { accountId: 'abc123', enableConsentMode: true, isEu: false };
+
+    let injected = false;
+    mock('queryPermission', () => true);
+    mock('setDefaultConsentState', () => {});
+    mock('injectScript', () => { injected = true; });
+    mockObject('localStorage', {
+      getItem: (key) => key === '__acceptrics_settings' ? '{"foo":1}' : null,
+      setItem: () => {}
+    });
+
+    runCode(mockData);
+
+    // If reading a missing .consent threw, injectScript would never run.
+    assertThat(injected).isEqualTo(true);
 setup: ''
 
 
